@@ -635,7 +635,9 @@ cdef class gibbs_sampler(object):
 #                 print("expression_vector", expression_vector)
 #                 print("self.clusters[clusterID].mean", self.clusters[clusterID].mean)
                 lik[index] = -0.5 * (self.clusters[clusterID].rank * _LOG_2PI + self.clusters[clusterID].log_pdet + \
-                                     np.sum(np.square(np.dot(expression_vector - self.clusters[clusterID].mean, self.clusters[clusterID].U))))
+                                     np.sum(np.square(np.dot(expression_vector[non_nan] - \
+                                                              self.clusters[clusterID].mean[non_nan], 
+                                                              self.clusters[clusterID].U[non_nan_idx].T[non_nan_idx]))))
        
         # scale the log-likelihoods down by subtracting (one less than) the largest log-likelihood
         # (which is equivalent to dividing by the largest likelihood), to avoid

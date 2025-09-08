@@ -4,3 +4,12 @@ build/
 .DS_Store 
 .eggs
 DP_GP_cluster.egg-info
+tissue_brain_control/
+tissue_brain_inflammed/
+tissue_liver/
+tissue_lung/
+bbb/
+tissue_all/
+
+
+Claude.md
