@@ -1,10 +1,30 @@
 
 [![Build Status](https://travis-ci.org/ReddyLab/DP_GP_cluster.svg?branch=master)](https://travis-ci.org/ReddyLab/DP_GP_cluster)
 
-## DP_GP_cluster
+## DP_GP_cluster (proteomics fork)
 
-DP_GP_cluster clusters genes by expression over a time course using a Dirichlet process Gaussian process model.
-    
+DP_GP_cluster clusters features by abundance over a time course using a Dirichlet process Gaussian process model.
+
+> **About this fork.** This repository is a **Python 3** port of the original
+> [PrincetonUniversity/DP_GP_cluster](https://github.com/PrincetonUniversity/DP_GP_cluster)
+> (Python 2), adapted here for **proteomics** time-course data rather than RNA-seq /
+> microarray gene expression. The clustering model is unchanged — only the input
+> domain, plot labels, and a cluster-distance utility are proteomics-specific.
+>
+> This fork implements the clustering methodology described in the paper
+> *"Endocytic Turnover of Endothelial Cell-Membrane Proteins as a Driver of Rat
+> Blood Brain Barrier Specialization and Dysfunction"* (ISCIENCE-D-25-18428R1).
+>
+> Throughout this README and the upstream code, references to "genes" /
+> "gene expression" should be read as **proteins** / **protein abundance**. Plot
+> y-axes are labeled `Protein abundance`.
+>
+> Two proteomics-fork additions on top of the upstream Python 3 port:
+> - **Inter-cluster distance** — see the [Inter-cluster distance](#inter-cluster-distance) section.
+> - **Long-running job monitoring** — optional logging and auto-restart wrappers for
+>   multi-day runs, see [Long-running jobs and monitoring](#long-running-jobs-and-monitoring).
+>   For short runs simply invoke `DP_GP_cluster.py` directly; monitoring is *not* required.
+
 ## Motivation
 
 Genes that follow similar expression trajectories in response to stress or stimulus tend to share biological functions.  Thus, it is reasonable and common to cluster genes by expression trajectories.  Two important considerations in this problem are (1) selecting the "correct" or "optimal" number of clusters and (2) modeling the trajectory and time-dependency of gene expression. A [Dirichlet process](http://en.wikipedia.org/wiki/Dirichlet_process) can determine the number of clusters in a nonparametric manner, while a [Gaussian process](http://en.wikipedia.org/wiki/Gaussian_process) can model the trajectory and time-dependency of gene expression in a nonparametric manner.
@@ -21,7 +41,7 @@ mamba install -c conda-forge Cython numpy
 ```
 3. Clone repo
 ```bash
-git clone https://github.com/Talavera-Lopez-Lab/DP_GP_cluster.git
+git clone https://github.com/Molecular-Bionics-Labs/DP_GP_cluster_proteomics.git
 ```
 4. Use pip for installation
 ```bash
@@ -164,7 +184,75 @@ With this approach, the user will have access to the GP models parameterized to 
     predict_new_y_from_cluster_GP(optimal_clusters_GP[2], new_x=7.2)
 
     
+## Inter-cluster distance
+
+After Gibbs sampling produces an optimal clustering and a gene-by-gene posterior
+similarity matrix `P(z_i = z_j)`, we summarize how close two clusters are by
+averaging the pairwise posterior co-clustering probabilities of their members:
+
+![cluster distance formula](cluster_dist/formula.jpg)
+
+That is, for clusters `Cₐ` and `C_b`:
+
+```
+S(Cₐ, C_b) = (1 / |Cₐ||C_b|) · Σ_{i ∈ Cₐ, j ∈ C_b}  P(z_i = z_j)
+D(Cₐ, C_b) = 1 − S(Cₐ, C_b)
+```
+
+The implementation is in [`cluster_dist/110_cluster_distances.py`](cluster_dist/110_cluster_distances.py).
+It is vectorized with `numpy.ix_` and is intended for large similarity matrices
+(tested on a 19 K × 19 K matrix). Outputs:
+
+- `cluster_similarity_matrix.tsv` — `S(Cₐ, C_b)`
+- `cluster_distance_matrix.tsv` — `D = 1 − S`
+- `cluster_distance_heatmap.png`
+- `cluster_dendrogram.png` (average-linkage hierarchy on `D`)
+
+Adjust the `BASE` / input paths at the top of the script for your data, then:
+
+```bash
+python cluster_dist/110_cluster_distances.py
+```
+
+## Long-running jobs and monitoring
+
+Gibbs sampling over thousands of features can take **days** to converge. To make
+overnight / multi-day runs reliable, this repo ships an optional monitoring
+layer in [`MONITORING.md`](MONITORING.md):
+
+- **`run_dp_gp_monitored.sh`** — wrapper around `DP_GP_cluster.py` that adds
+  timestamped logs, memory / disk tracking, signal handling, an 83-hour timeout
+  guard, and optional email / Slack / GitHub-issue notifications on
+  start / finish / crash.
+- **`monitor_dp_gp.sh --auto-restart`** — external watchdog that detects a
+  crashed run and restarts it (configurable max attempts), so a single OOM or
+  transient error does not waste the whole run.
+- **`setup_monitoring.sh`** — interactive first-time setup for the
+  notification channels.
+
+Typical multi-day workflow:
+
+```bash
+./setup_monitoring.sh                            # one-time
+./monitor_dp_gp.sh --auto-restart --max-attempts=5 &
+./run_dp_gp_monitored.sh
+```
+
+All logs land in `logs/` (`dp_gp_*.log`, `monitor_*.log`). See
+[`MONITORING.md`](MONITORING.md) for the full feature list, notification config,
+troubleshooting tips, and recovery commands.
+
+The monitoring layer is **fully optional** — for short runs simply invoke
+`DP_GP_cluster.py` directly.
+
 ## Citation
+
+If you use this proteomics fork, please cite:
+
+> *"Endocytic Turnover of Endothelial Cell-Membrane Proteins as a Driver of Rat
+> Blood Brain Barrier Specialization and Dysfunction"* (ISCIENCE-D-25-18428R1).
+
+Original DP_GP_cluster method:
 
 I. C. McDowell, D. Manandhar, C. M. Vockley, A. Schmid, T. E. Reddy, B. Engelhardt, Clustering gene expression time series data using an infinite Gaussian process mixture model. _bioRxiv_  (2017).
 
