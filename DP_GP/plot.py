@@ -110,7 +110,7 @@ def plot_cluster_gene_expression(clusters, gene_expression_matrix, t, t_labels, 
                 ax.set_xlabel("Time in %s"%(time_unit))
             ax.set_xticks(t)
             ax.set_xticklabels(t_labels)
-            ax.set_ylabel('Gene expression')
+            ax.set_ylabel('Protein abundance')
             ax.set_title('Cluster %s'%(index))
             index+=1
         
