@@ -3,31 +3,27 @@
 
 ## DP_GP_cluster (proteomics fork)
 
-DP_GP_cluster clusters features by abundance over a time course using a Dirichlet process Gaussian process model.
+Methodology clusters dataset samples by abundance patternt over a time course using a Dirichlet process Gaussian process model.
 
-> **About this fork.** This repository is a **Python 3** port of the original
-> [PrincetonUniversity/DP_GP_cluster](https://github.com/PrincetonUniversity/DP_GP_cluster)
-> (Python 2), adapted here for **proteomics** time-course data rather than RNA-seq /
-> microarray gene expression. The clustering model is unchanged — only the input
-> domain, plot labels, and a cluster-distance utility are proteomics-specific.
->
-> This fork implements the clustering methodology described in the paper
-> *"Endocytic Turnover of Endothelial Cell-Membrane Proteins as a Driver of Rat
-> Blood Brain Barrier Specialization and Dysfunction"* (ISCIENCE-D-25-18428R1).
->
-> Throughout this README and the upstream code, references to "genes" /
-> "gene expression" should be read as **proteins** / **protein abundance**. Plot
-> y-axes are labeled `Protein abundance`.
->
-> Two proteomics-fork additions on top of the upstream Python 3 port:
-> - **Inter-cluster distance** — see the [Inter-cluster distance](#inter-cluster-distance) section.
-> - **Long-running job monitoring** — optional logging and auto-restart wrappers for
->   multi-day runs, see [Long-running jobs and monitoring](#long-running-jobs-and-monitoring).
->   For short runs simply invoke `DP_GP_cluster.py` directly; monitoring is *not* required.
+This fork implements the clustering methodology described in the paper [*"Endocytic Turnover of Endothelial Cell-Membrane Proteins as a Driver of Rat Blood Brain Barrier Specialization and Dysfunction"* (ISCIENCE-D-25-18428R1)](https://doi.org/10.1016/j.isci.2026.116231).
+
+
+**About this fork.** 
+> This repository is a **Python 3** port of the original [PrincetonUniversity/DP_GP_cluster](https://github.com/PrincetonUniversity/DP_GP_cluster) (Python 2), adapted here for **proteomics** time-course data mirroring the [methodology developed for RNA-seq microarray gene expression](https://doi.org/10.1371/journal.pcbi.1005896). <br>
+The input domain, plot labels are proteomics-specific, and a cluster-distance utility is a universal add-on suitable for any feature set.<br>
+Throughout this README and the upstream code, "gene" / "gene expression" are interchangebly used with **proteins** / **protein abundance**, since in our dataset protein unique identifies are constructed including their protein-encoding gene names, we leave varaiable and functions with gene naming convention in deep code scripts, where it doesn't affect output.<br>
+Plot y-axes in this version are labeled `Protein abundance` for a more consistent user output.
+
+Proteomics-fork additions:
+- **Inter-cluster distance** — see the [Inter-cluster distance](#inter-cluster-distance) section.
+- **Long-running job monitoring** — optional logging and auto-restart wrappers for multi-day runs, see [Long-running jobs and monitoring](#long-running-jobs-and-monitoring).
+For short runs simply use `DP_GP_cluster.py` directly; monitoring is *not* required.
 
 ## Motivation
 
-Genes that follow similar expression trajectories in response to stress or stimulus tend to share biological functions.  Thus, it is reasonable and common to cluster genes by expression trajectories.  Two important considerations in this problem are (1) selecting the "correct" or "optimal" number of clusters and (2) modeling the trajectory and time-dependency of gene expression. A [Dirichlet process](http://en.wikipedia.org/wiki/Dirichlet_process) can determine the number of clusters in a nonparametric manner, while a [Gaussian process](http://en.wikipedia.org/wiki/Gaussian_process) can model the trajectory and time-dependency of gene expression in a nonparametric manner.
+Evidence indicates that the endocytic dynamics of proteins, particularly how long a protein resides at the plasma membrane, play an important role in determining cellular behavior. Endocytic dynamics refers to the patterns by which proteins are internalized, recycled, and degraded, and it contains information about membrane protein regulation. Despite this, it remains largely unknown whether brain endothelial cells (BECs) have a distinct endocytic signature that contributes to their specialized phenotype.
+For this reason, and for the first time in this context, we cluster proteins originated from peripheral, healthy brain and inflamed brain tissues in order to identify unique endocytic profiles for individual proteins across phenotypes, and quantitatively estimate differences that characterize healthy brain phenotype, and how protein behavior changes with inflammation.
+Even though parametric (linear) modeling detects endocytic profile differences between brain and peripheral, it oversimplifies complex endocytic patterns which may contain important biological information. Therefore, we implemented a non-parametric modeling approach allowing us to: (1) determine the optimal number of clusters employing a [Dirichlet process](http://en.wikipedia.org/wiki/Dirichlet_process), while iteratively (2) modeling the trajectory and time-dependency of protein abundance via a [Gaussian process](http://en.wikipedia.org/wiki/Gaussian_process).
 
 ## Installation and Dependencies
 1. create and activate conda/mamba environment
@@ -63,40 +59,41 @@ It has been tested in linux with Python 3.10 and with Anaconda distributions of 
 
 ## Code Examples
 
-To cluster genes by expression over time course and create gene-by-gene posterior similarity matrix:
+To cluster proteins by abundance over time course and create protein-by-protein posterior similarity matrix:
     
-    DP_GP_cluster.py -i /path/to/expression.txt -o /path/to/output_prefix [ optional args, e.g. -n 2000 --true_times --criterion MAP --plot ... ]
+    DP_GP_cluster.py -i /path/to/abundance.txt -o /path/to/output_prefix [ optional args, e.g. -n 2000 --true_times --criterion MAP --plot ... ]
     
-Above, `expression.txt` is of the format:
+Above, `abundance.txt` is of the format:
 
-    gene    1     2    3    ...    time_t
-    gene_1  10    20   5    ...    8
-    gene_2  3     2    50   ...    8
-    gene_3  18    100  10   ...    22
+    protein    1     2    3    ...    time_t
+    protein_1  10    20   5    ...    8
+    protein_2  3     2    50   ...    8
+    protein_3  18    100  10   ...    22
     ...
-    gene_n  45    22   15   ...    60
+    protein_n  45    22   15   ...    60
 
-where the first row is a header containing the time points and the first column is an index containing all gene names. Entries are delimited by tabs.
+where the first row is a header containing the time points and the first column is an index containing all protein names. Entries are delimited by tabs.
 
-DP_GP_cluster can handle missing data so if an expression value for a given gene at a given time point leave blank or represent with "NA".
+DP_GP_cluster can handle missing data so if an abundance value for a given protein at a given time point leave blank or represent with "NA".
+For the proteomics dataset we avoid using samples with missing data to prevent biased data imputation.
 
-We recommend clustering only differentially expressed genes to save runtime. If genes can further be separated by up- and down-regulated beforehand, this will also substantially decrease runtime.
+McDowell et al recommended clustering only differentially expressed genes/proteins to save runtime. For large datasets, common for proteomics studies, we overcome this limitation having developed a script for realiable multi-day runs with timestamped logs, memory tracking, an 83-hour timeout guard, crashes detector and restart-on-crush option. It is described in [Long-running jobs and monitoring] section
 
-To cluster thousands of genes, use option `--fast`, although in this mode, no missing data allowed.
+Alternatively, to cluster thousands of genes/ proteins, legacy option `--fast` exist, although in this mode, no missing data allowed. We recommend to run the full cycle in monitored mode.
 
 From the above command, the optimal clustering will be saved at `/path/to/output_path_prefix_optimal_clustering.txt` in a simple tab-delimited format:
 
-    cluster	gene
-    1	gene_1
-    1	gene_23
-    2	gene_7
+    cluster	protein
+    1	protein_1
+    1	protein_23
+    2	protein_7
     ...
-    k	gene_30
+    k	protein_30
     
 Because the optimal clustering is chosen after the entirety of Gibbs sampling, the script can be rerun with alternative clustering optimality criteria to yield different sets of clusters. Also, if `--plot` flag was not indicated when the above script is called, plots can be generated after sampling:
 
     DP_GP_cluster.py \
-    -i /path/to/expression.txt \
+    -i /path/to/abundance.txt \
     --sim_mat /path/to/output_prefix_posterior_similarity_matrix.txt \
     --clusterings /path/to/output_prefix_clusterings.txt \
     --criterion MPEAR \
@@ -105,17 +102,17 @@ Because the optimal clustering is chosen after the entirety of Gibbs sampling, t
     --output /path/to/output_prefix_MPEAR_optimal_clustering.txt \
     --output_path_prefix /path/to/output_prefix_MPEAR
 
-When the `--plot` flag is indicated, the script plots (1) gene expression trajectories by cluster along with the Gaussian Process parameters of each cluster and (2) the posterior similarity matrix in the form of a heatmap with dendrogram. For example:
+When the `--plot` flag is indicated, the script plots (1) abundance trajectories by cluster along with the Gaussian Process parameters of each cluster and (2) the posterior similarity matrix in the form of a heatmap with dendrogram. For example:
 
-#### Gene expression trajectories by cluster*
-![expression](https://github.com/PrincetonUniversity/DP_GP_cluster/blob/master/auxiliary/expression.png)
+#### Protein abundance trajectories by cluster*
+![expression](auxiliary/tissue_all_gene_expression_fig_1.png =500x)
 
-*from McDowell et al. 2017, A549 dexamethasone exposure RNA-seq data
+*supplement for [Tomás-Sitjes et al. 2026. Endocytic turnover of endothelial cell-membrane proteins as a driver of rat blood-brain barrier specialization and dysfunction. iScience, 29(6), 116231](https://doi.org/10.1016/j.isci.2026.116231)
 
 #### Posterior similarity matrix**
-![PSM](https://github.com/PrincetonUniversity/DP_GP_cluster/blob/master/auxiliary/PSM.png)
+![PSM](auxiliary/tissue_all_posterior_similarity_matrix_heatmap.png =500x)
 
-**from McDowell et al. 2017, _H. salinarum_ hydrogen peroxide exposure microarray data
+**supplement for [Tomás-Sitjes et al. 2026. Endocytic turnover of endothelial cell-membrane proteins as a driver of rat blood-brain barrier specialization and dysfunction. iScience, 29(6), 116231](https://doi.org/10.1016/j.isci.2026.116231)
 
 For more details on particular parameters, see detailed help message in script.
 
@@ -129,46 +126,45 @@ Users have the option of directly importing DP_GP for direct access to functions
     import numpy as np
     from collections import defaultdict
 
-    expression = "/path/to/expression.txt"
+    abundance = "/path/to/abundance.txt"
     optimal_clusters_out = "/path/to/optimal_clusters.txt"
 
-    # read in gene expression matrix
-    gene_expression_matrix, gene_names, t, t_labels = core.read_gene_expression_matrices([expression])
+    # read in protein abundance matrix
+    protein_abundance_matrix, protein_names, t, t_labels = core.read_protein_abundance_matrices([abundance])
 
     # run Gibbs Sampler
-    GS = core.gibbs_sampler(gene_expression_matrix, t, 
+    GS = core.gibbs_sampler(protein_abundance_matrix, t, 
                             max_num_iterations=200, 
                             burnIn_phaseI=50, burnIn_phaseII=100)
     sim_mat, all_clusterings, sampled_clusterings, log_likelihoods, iter_num = GS.sampler()
 
-    sampled_clusterings.columns = gene_names
-    all_clusterings.columns = gene_names
+    sampled_clusterings.columns = protein_names
+    all_clusterings.columns = protein_names
 
     # select best clustering by maximum a posteriori estimate
     optimal_clusters = cluster_tools.best_clustering_by_log_likelihood(np.array(sampled_clusterings), 
                                                                        log_likelihoods)
 
-    # combine gene_names and optimal_cluster info
+    # combine protein_names and optimal_cluster info
     optimal_cluster_labels = defaultdict(list)
-    optimal_cluster_labels_original_gene_names = defaultdict(list)
-    for gene, (gene_name, cluster) in enumerate(zip(gene_names, optimal_clusters)):
-        optimal_cluster_labels[cluster].append(gene)
-        optimal_cluster_labels_original_gene_names[cluster].append(gene_name)
+    optimal_cluster_labels_original_protein_names = defaultdict(list)
+    for protein, (protein_name, cluster) in enumerate(zip(protein_names, optimal_clusters)):
+        optimal_cluster_labels[cluster].append(protein)
+        optimal_cluster_labels_original_protein_names[cluster].append(protein_name)
 
     # save optimal clusters
-    cluster_tools.save_cluster_membership_information(optimal_cluster_labels_original_gene_names, 
-                                                      optimal_clusters_out)
+    cluster_tools.save_cluster_membership_information(optimal_cluster_labels_original_protein_names, optimal_clusters_out)
 
-With this approach, the user will have access to the GP models parameterized to each cluster. With this, the user could, e.g., draw samples from a cluster GP or predict a new expression value at a new time point along with the associated uncertainty.
+With this approach, the user will have access to the GP models parameterized to each cluster. With this, the user could, e.g., draw samples from a cluster GP or predict a new abundance value at a new time point along with the associated uncertainty.
 
     # [continued from above]
     # optimize GP model for best clustering
     optimal_clusters_GP = {}
-    for cluster, genes in optimal_cluster_labels.iteritems():
-        optimal_clusters_GP[cluster] = core.dp_cluster(members=genes, 
+    for cluster, proteins in optimal_cluster_labels.iteritems():
+        optimal_clusters_GP[cluster] = core.dp_cluster(members=proteins, 
                                                        X=np.vstack(t), 
-                                                       Y=np.array(np.mat(gene_expression_matrix[genes,:])).T)
-        optimal_clusters_GP[cluster] = optimal_clusters_GP[cluster].update_cluster_attributes(gene_expression_matrix)
+                                                       Y=np.array(np.mat(protein_abundance_matrix[proteins,:])).T)
+        optimal_clusters_GP[cluster] = optimal_clusters_GP[cluster].update_cluster_attributes(protein_abundance_matrix)
 
     def draw_samples_from_cluster_GP(cluster_GP, n_samples=1):
         samples = np.random.multivariate_normal(cluster_GP.mean, cluster_GP.covK, n_samples)    
@@ -186,25 +182,24 @@ With this approach, the user will have access to the GP models parameterized to 
     
 ## Inter-cluster distance
 
-After Gibbs sampling produces an optimal clustering and a gene-by-gene posterior
-similarity matrix `P(z_i = z_j)`, we summarize how close two clusters are by
+After Gibbs sampling produces an optimal clustering and a protein-by-protein posterior
+similarity matrix $P(z_i = z_j| data)$, 
+
+We can define cluster-cluster similarity for clusters $C_a$ and $C_b$ by summarizing how close two clusters are by
 averaging the pairwise posterior co-clustering probabilities of their members:
 
-![cluster distance formula](cluster_dist/formula.jpg)
+$$S(C_a, C_b) = \frac{1}{|C_a||C_b|} \cdot \sum_{i ∈ C_a} \sum_{j ∈ C_b}  P(z_i = z_j)$$
 
-That is, for clusters `Cₐ` and `C_b`:
+Therefore, distance when needed is additive inverse:
+$$D(C_a, C_b) = 1 − S(C_a, C_b)$$
 
-```
-S(Cₐ, C_b) = (1 / |Cₐ||C_b|) · Σ_{i ∈ Cₐ, j ∈ C_b}  P(z_i = z_j)
-D(Cₐ, C_b) = 1 − S(Cₐ, C_b)
-```
 
 The implementation is in [`cluster_dist/110_cluster_distances.py`](cluster_dist/110_cluster_distances.py).
 It is vectorized with `numpy.ix_` and is intended for large similarity matrices
 (tested on a 19 K × 19 K matrix). Outputs:
 
-- `cluster_similarity_matrix.tsv` — `S(Cₐ, C_b)`
-- `cluster_distance_matrix.tsv` — `D = 1 − S`
+- `cluster_similarity_matrix.tsv` — $S(C_a, C_b)$
+- `cluster_distance_matrix.tsv` — $D = 1 − S$
 - `cluster_distance_heatmap.png`
 - `cluster_dendrogram.png` (average-linkage hierarchy on `D`)
 
@@ -214,11 +209,14 @@ Adjust the `BASE` / input paths at the top of the script for your data, then:
 python cluster_dist/110_cluster_distances.py
 ```
 
+![cluster_dist](auxiliary/cluster_dendrogram.png =1000x)
+***supplement for [Tomás-Sitjes et al. 2026. Endocytic turnover of endothelial cell-membrane proteins as a driver of rat blood-brain barrier specialization and dysfunction. iScience, 29(6), 116231](https://doi.org/10.1016/j.isci.2026.116231)
+
 ## Long-running jobs and monitoring
 
-Gibbs sampling over thousands of features can take **days** to converge. To make
+Gibbs sampling over thousands of samples and features can take **days** to converge. To make
 overnight / multi-day runs reliable, this repo ships an optional monitoring
-layer in [`MONITORING.md`](MONITORING.md):
+layer in described in [`MONITORING.md`](MONITORING.md):
 
 - **`run_dp_gp_monitored.sh`** — wrapper around `DP_GP_cluster.py` that adds
   timestamped logs, memory / disk tracking, signal handling, an 83-hour timeout
@@ -233,7 +231,7 @@ layer in [`MONITORING.md`](MONITORING.md):
 Typical multi-day workflow:
 
 ```bash
-./setup_monitoring.sh                            # one-time
+./setup_monitoring.sh                                       # one-time
 ./monitor_dp_gp.sh --auto-restart --max-attempts=5 &
 ./run_dp_gp_monitored.sh
 ```
@@ -242,21 +240,21 @@ All logs land in `logs/` (`dp_gp_*.log`, `monitor_*.log`). See
 [`MONITORING.md`](MONITORING.md) for the full feature list, notification config,
 troubleshooting tips, and recovery commands.
 
-The monitoring layer is **fully optional** — for short runs simply invoke
-`DP_GP_cluster.py` directly.
+The monitoring layer is **optional**, but allow for more stable results than `--fast` option for large datasets.
+For short runs simply use `DP_GP_cluster.py` directly.
 
 ## Citation
 
 If you use this proteomics fork, please cite:
 
-> *"Endocytic Turnover of Endothelial Cell-Membrane Proteins as a Driver of Rat
-> Blood Brain Barrier Specialization and Dysfunction"* (ISCIENCE-D-25-18428R1).
+Tomás-Sitjes A, Arauz-Garofalo G, Gay M, Jarió S, Vilaseca M, Schastlivaia V, Kessen M, Manicardi N, Battaglia G, Gonzalez-Carter D, **Endocytic Turnover of Endothelial Cell-Membrane Proteins as a Driver of Rat Blood Brain Barrier Specialization and Dysfunction** _iScience. A Cell Press journal (2026)_ ISCIENCE-D-25-18428R1
+[doi: 10.1016/j.isci.2026.116231](https://doi.org/10.1016/j.isci.2026.116231)
 
-Original DP_GP_cluster method:
+And the original DP_GP_cluster method:
+<!-- 
+*I. C. McDowell, D. Manandhar, C. M. Vockley, A. Schmid, T. E. Reddy, B. Engelhardt, Clustering gene expression time series data using an infinite Gaussian process mixture model.* _bioRxiv_ (2017) -->
 
-I. C. McDowell, D. Manandhar, C. M. Vockley, A. Schmid, T. E. Reddy, B. Engelhardt, Clustering gene expression time series data using an infinite Gaussian process mixture model. _bioRxiv_  (2017).
-
-I. C. McDowell, D. Manandhar, C. M. Vockley, A. Schmid, T. E. Reddy, B. Engelhardt, Clustering gene expression time series data using an infinite Gaussian process mixture model. _PLOS Computational Biology_ (In revision).
+McDowell I. C. , Manandhar D., Vockley C. M., Schmid A., Reddy T. E., Engelhardt B., **Clustering gene expression time series data using an infinite Gaussian process mixture model.** _PLOS Computational Biology (2018)_ [doi: 10.1371/journal.pcbi.1005896](https://doi.org/10.1371/journal.pcbi.1005896)
 
 ## License
 [BSD 3-clause](https://github.com/PrincetonUniversity/DP_GP_cluster/blob/master/LICENSE)
